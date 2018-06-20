@@ -186,6 +186,40 @@ RenderLoop(const string& font_path,
     {
       if(subtitles[next_index].stop > time)
       {
+        // Join two next subtitles if they overlap and aren't the same
+        // Recommended to have at least 5 lines enabled
+        if(subtitles.size() > next_index + 1)
+        {
+          const auto next_1 = subtitles[next_index];
+          const auto next_2 = subtitles[next_index+1];
+          if(next_1.stop > next_2.start)
+          {
+            std::vector<std::string> both_subs = next_1.text_lines;
+            both_subs.insert(both_subs.end(), next_2.text_lines.cbegin(), next_2.text_lines.cend());
+            std::vector<std::string> unique_subs{};
+            // Ensuring lines are unique may be unnecessary, except for some rare cases
+            for(const auto& new_line : both_subs)
+            {
+              bool found = false;
+              for(const auto& old_line : unique_subs)
+              {
+                if(new_line == old_line)
+                {
+                  found = true;
+                  break;
+                }
+              }
+              if(!found)
+              {
+                unique_subs.push_back(new_line);
+              }
+            }
+            subtitles.erase(subtitles.begin()+next_index+1);
+            subtitles[next_index].stop = next_2.stop;
+            subtitles[next_index].text_lines = unique_subs;
+          }
+        }
+
         renderer.prepare(subtitles[next_index].text_lines);
         have_next = true;
         break;
@@ -307,6 +341,9 @@ RenderLoop(const string& font_path,
         // printf("show error: %i ms\n", now - subtitles[next_index].start);
         showing = true;
         current_stop = subtitles[next_index].stop;
+        if(subtitles.size() > next_index + 1) {
+          current_stop = subtitles[next_index+1].start;
+        }
 
         ++next_index;
         have_next = false;

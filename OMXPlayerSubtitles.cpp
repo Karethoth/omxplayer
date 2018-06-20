@@ -182,15 +182,82 @@ RenderLoop(const string& font_path,
 
   auto TryPrepare = [&](int time)
   {
+    // Make sure all subtitles are unique and don't contain trash
+
+    std::vector<Subtitle> cleaned_subs;
+    std::copy_if(
+      subtitles.begin(),
+      subtitles.end(),
+      std::back_inserter(cleaned_subs),
+      [&](Subtitle s) {
+        if(s.stop < time) {
+          return true;
+        }
+
+        for(auto it = s.text_lines.begin(); it != s.text_lines.end();)
+        {
+          if((*it).find("m 0 0") != std::string::npos)
+          {
+            it = s.text_lines.erase(it);
+            continue;
+          }
+          it++;
+        }
+        return s.text_lines.size() > 0;
+      }
+    );
+
+    std::vector<Subtitle> unique_subs{};
+    for(const auto& sub : cleaned_subs)
+    {
+      if(sub.stop < time) {
+        unique_subs.push_back(sub);
+        continue;
+      }
+      bool found_match = false;
+      for(const auto& unique_sub : unique_subs)
+      {
+        if(sub.start != unique_sub.start) continue;
+        if(sub.stop != unique_sub.stop) continue;
+        if(sub.text_lines.size() != unique_sub.text_lines.size()) continue;
+
+        bool lines_match = true;
+        for(size_t i=0; i<sub.text_lines.size(); i++)
+        {
+          if(sub.text_lines[i] != unique_sub.text_lines[i]) {
+            lines_match = false;
+            break;
+          }
+        }
+
+        if(lines_match) {
+          found_match = true;
+          break;
+        }
+      }
+
+      if(!found_match) {
+        unique_subs.push_back(sub);
+      }
+    }
+
+    subtitles = unique_subs;
+
     for(; next_index != subtitles.size(); ++next_index)
     {
-      if(subtitles[next_index].stop > time)
+      const auto next_1 = subtitles[next_index];
+      if(next_1.stop > time)
       {
+        printf("Subtitle packet lines(%d loaded) (%d -> %d):\n", subtitles.size(), next_1.start, next_1.stop);
+        for(const auto& line : next_1.text_lines)
+        {
+          printf("\t'%s'\n", line.c_str());
+        }
+
         // Join the next two subtitles if they overlap and aren't the same
         // Recommended to have at least 5 lines enabled
         if(subtitles.size() > next_index + 1)
         {
-          const auto next_1 = subtitles[next_index];
           const auto next_2 = subtitles[next_index+1];
           if(next_1.stop > next_2.start)
           {

@@ -186,7 +186,7 @@ RenderLoop(const string& font_path,
     {
       if(subtitles[next_index].stop > time)
       {
-        // Join two next subtitles if they overlap and aren't the same
+        // Join the next two subtitles if they overlap and aren't the same
         // Recommended to have at least 5 lines enabled
         if(subtitles.size() > next_index + 1)
         {
@@ -342,7 +342,8 @@ RenderLoop(const string& font_path,
         showing = true;
         current_stop = subtitles[next_index].stop;
         if(subtitles.size() > next_index + 1) {
-          current_stop = subtitles[next_index+1].start;
+          const auto next_start = subtitles[next_index+1].start;
+          current_stop = min(current_stop, next_start);
         }
 
         ++next_index;
